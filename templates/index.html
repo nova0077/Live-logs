@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      #logContent {
+        height: 90vh;
+        width: 50vw;
+        border: 1px solid #111;
+        overflow-y: auto;
+        text-align: center;
+      }
+
+      #playBtn {
+        padding: 5px;
+        background-color: cyan;
+        color: black;
+        border-radius: 5px;
+      }
+
+      #pauseBtn {
+        margin: 5px;
+        padding: 5px;
+        background-color: black;
+        color: white;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- <div class="test"></div> -->
+    <div class="container">
+      <div id="logContent">
+        <pre>{{data}}</pre>
+      </div>
+      <button id="playBtn">Play</button>
+      <button id="pauseBtn">Pause</button>
+    </div>
+
+    <script>
+      let autoScroll = true;
+      const logContent = document.getElementById("logContent");
+      const playBtn = document.getElementById("playBtn");
+      const pauseBtn = document.getElementById("pauseBtn");
+
+      function scrollToBottom() {
+        logContent.scrollTop = logContent.scrollHeight;
+      }
+
+      const handleNewData = (e) => {
+        logContent.innerText += e.data;
+        if (autoScroll) {
+          scrollToBottom();
+        }
+      };
+
+      let eventSource;
+      eventSource = new EventSource("{{ url_for('sse.stream') }}");
+
+      eventSource.onopen = (e) => {
+        console.log("eventSource open", e);
+      };
+
+      eventSource.onmessage = (e) => {
+        console.log("eventSource onmessage");
+        console.log(e.data);
+      };
+
+      eventSource.addEventListener("init_log", (e) => {
+        console.log("init logs");
+        console.log(e);
+      });
+
+      eventSource.addEventListener("log_update", (e) => handleNewData(e));
+
+      function generateRandomClientId() {
+        const timestamp = Date.now().toString(36);
+        const randomString = Math.random().toString(36).substr(2);
+
+        return timestamp + randomString;
+      }
+
+      function startLogStreaming() {
+        const client_id = generateRandomClientId();
+        eventSource = new EventSource("{{ url_for('sse.stream') }}");
+        eventSource.addEventListener("log_update", (e) => handleNewData(e));
+      }
+
+      function stopLogStreaming() {
+        if (eventSource) {
+          // eventSource.removeEventListener("log_update", (e) => handleNewData(e))
+          eventSource.close();
+        }
+      }
+
+      playBtn.addEventListener("click", () => {
+        startLogStreaming();
+
+        playBtn.style.display = "none";
+        pauseBtn.style.display = "inline";
+      });
+
+      pauseBtn.addEventListener("click", () => {
+        stopLogStreaming();
+        playBtn.style.display = "inline";
+        pauseBtn.style.display = "none";
+      });
+
+      logContent.addEventListener("scroll", () => {
+        const distanceFromBottom =
+          logContent.scrollHeight -
+          (logContent.scrollTop + logContent.clientHeight);
+
+        // If the user is at the bottom, enable auto-scrolling
+        autoScroll = distanceFromBottom < 5;
+      });
+
+      // Disable play button by default
+      playBtn.style.display = "none";
+    </script>
+  </body>
+</html>
